@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus | Skills Exchange Platform</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --danger: #f43f5e;
+            --success: #10b981;
+            --star-color: #fbbf24;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .auth-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            padding: 30px; border-radius: 16px; width: 100%; max-width: 460px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .auth-card h2 { margin-bottom: 20px; font-size: 22px; font-weight: 600; text-align: center; }
+
+        input, select, textarea {
+            width: 100%; padding: 10px 14px; margin-bottom: 12px; background: #0f172a;
+            border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-size: 14px;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+        button {
+            padding: 10px 16px; background: var(--accent); color: #0f172a; font-weight: 600;
+            border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; font-size: 14px;
+        }
+        button:hover { background: var(--accent-hover); }
+
+        .dashboard { display: none; max-width: 1050px; margin: 0 auto; padding: 25px 20px; width: 100%; flex: 1; }
+        
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .nav-left { display: flex; gap: 12px; align-items: center; }
+        .nav-right { display: flex; gap: 16px; align-items: center; }
+
+        .bell-icon { position: relative; cursor: pointer; font-size: 20px; background: var(--card-bg); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 50%; }
+        .bell-badge { position: absolute; top: 2px; right: 2px; background: var(--danger); color: white; font-size: 10px; font-weight: bold; width: 16px; height: 16px; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+
+        .mentor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .mentor-card {
+            background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: transform 0.2s, border-color 0.2s;
+            display: flex; gap: 15px; align-items: flex-start;
+        }
+        .mentor-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+        .avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+        .mentor-name { font-size: 17px; font-weight: 600; }
+        .mentor-bio { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .profile-view { display: none; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 30px; margin-top: 20px; }
+        .section-title { font-size: 15px; font-weight: 600; margin: 20px 0 10px 0; color: var(--accent); }
+        .tag { background: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; display: inline-block; margin-right: 6px; margin-bottom: 6px; }
+        .tag-want { background: #1e3a8a; color: #93c5fd; }
+
+        .star-rating { display: flex; gap: 6px; font-size: 26px; cursor: pointer; margin-bottom: 12px; color: var(--border-color); }
+        .star-rating .star.active { color: var(--star-color); }
+        .cert-img { max-width: 100%; max-height: 180px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 8px; }
+
+        .notif-card { background: #0f172a; padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 12px; }
+        .notif-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-accept { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .btn-deny { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- AUTHENTICATION MODAL -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="auth-card">
+            <h2 id="auth-title">Welcome to Nexus</h2>
+            
+            <div id="login-form">
+                <input type="email" id="log-email" placeholder="Email Address">
+                <input type="password" id="log-password" placeholder="Password">
+                <button style="width:100%;" onclick="handleLogin()">Sign In</button>
+                <div onclick="toggleAuthMode()" style="text-align:center; margin-top:12px; font-size:13px; cursor:pointer;">Don't have an account? <span style="color:var(--accent);">Register</span></div>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <input type="text" id="reg-name" placeholder="Full Name">
+                <input type="email" id="reg-email" placeholder="Email Address">
+                <input type="password" id="reg-password" placeholder="Password">
+                <input type="text" id="reg-phone" placeholder="Contact Phone Number (Optional)">
+                <select id="reg-role">
+                    <option value="Learner">Learner</option>
+                    <option value="Mentor">Mentor</option>
+                    <option value="Both">Both (Offers & Wants)</option>
+                </select>
+                <input type="text" id="reg-bio" placeholder="Short Bio (visible on profile)">
+                <input type="text" id="reg-avatar" placeholder="Avatar Photo Image URL (Optional)">
+                <input type="text" id="reg-offer" placeholder="Skill Offered (e.g. Python, UI/UX)">
+                <input type="text" id="reg-want" placeholder="Skill Wanted (e.g. Spanish, Guitar)">
+                <button style="width:100%;" onclick="handleRegister()">Create Account</button>
+                <div onclick="toggleAuthMode()" style="text-align:center; margin-top:12px; font-size:13px; cursor:pointer;">Already have an account? <span style="color:var(--accent);">Sign In</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODIFY ACCOUNT MODAL -->
+    <div id="account-modal" class="modal-overlay hidden">
+        <div class="auth-card">
+            <h2>Modify Account Settings</h2>
+            <input type="text" id="acc-name" placeholder="Full Name">
+            <input type="text" id="acc-phone" placeholder="Contact Phone Number">
+            <textarea id="acc-bio" placeholder="Your Public Bio"></textarea>
+            <input type="text" id="acc-avatar" placeholder="Profile Picture Avatar URL">
+            <button style="width:100%; margin-bottom:10px;" onclick="saveAccountSettings()">Save Account Settings</button>
+            
+            <hr style="border-color:var(--border-color); margin:15px 0;">
+            <h3 style="font-size:15px; margin-bottom:10px;">Upload Certificate Proof</h3>
+            <input type="text" id="cert-title" placeholder="Certificate Title">
+            <input type="text" id="cert-desc" placeholder="Details / Issuer">
+            <input type="text" id="cert-url" placeholder="Certificate Picture Image URL">
+            <button style="width:100%; background:var(--success); color:white;" onclick="uploadCertificate()">Add Certificate Proof</button>
+
+            <button style="width:100%; background:transparent; border:1px solid var(--border-color); color:var(--text-muted); margin-top:12px;" onclick="closeAccountModal()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- NOTIFICATIONS MODAL -->
+    <div id="notif-modal" class="modal-overlay hidden">
+        <div class="auth-card" style="max-width: 520px;">
+            <h2>Notifications</h2>
+            <div id="notif-list" style="max-height: 360px; overflow-y: auto;"></div>
+            <button style="width:100%; background:transparent; border:1px solid var(--border-color); color:var(--text-muted); margin-top:12px;" onclick="closeNotifModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="dashboard">
+        <div class="top-bar">
+            <div class="nav-left">
+                <button onclick="openAccountModal()">Modify Account</button>
+            </div>
+            <div class="nav-right">
+                <div class="bell-icon" onclick="openNotifModal()">
+                    🔔 <span id="bell-count" class="bell-badge">0</span>
+                </div>
+                <button style="background:transparent; border:1px solid var(--danger); color:var(--danger);" onclick="handleLogout()">Sign Out</button>
+            </div>
+        </div>
+
+        <div id="search-panel">
+            <div style="display:flex; gap:12px; margin-bottom:25px;">
+                <input type="text" id="search-input" style="margin-bottom:0;" placeholder="Search mentors by skill...">
+                <button style="width:140px;" onclick="searchMentors()">Search</button>
+            </div>
+            <div id="mentor-results" class="mentor-grid"></div>
+        </div>
+
+        <div id="profile-panel" class="profile-view">
+            <button style="background:transparent; border:1px solid var(--border-color); color:var(--text-muted); margin-bottom:15px;" onclick="backToSearch()">← Back to Search</button>
+            <div id="profile-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('nexus_token') || '';
+        let currentViewMode = 'login';
+        let selectedRating = 5;
+
+        window.onload = () => {
+            if (authToken) {
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('dashboard').style.display = 'block';
+                searchMentors();
+                loadNotificationCount();
+            }
+        };
+
+        function toggleAuthMode() {
+            currentViewMode = currentViewMode === 'login' ? 'register' : 'login';
+            document.getElementById('auth-title').innerText = currentViewMode === 'login' ? 'Welcome Back' : 'Join Nexus Platform';
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('register-form').classList.toggle('hidden');
+        }
+
+        async function handleRegister() {
+            let body = {
+                name: document.getElementById('reg-name').value,
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                phone: document.getElementById('reg-phone').value,
+                role: document.getElementById('reg-role').value,
+                bio: document.getElementById('reg-bio').value,
+                avatar_url: document.getElementById('reg-avatar').value,
+                offer_skill_name: document.getElementById('reg-offer').value,
+                want_skill_name: document.getElementById('reg-want').value
+            };
+            try {
+                let res = await fetch('/api/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                let data = await res.json();
+                if (res.ok) {
+                    alert("Registration successful! Please sign in.");
+                    toggleAuthMode();
+                } else { 
+                    alert(data.error || "Registration failed."); 
+                }
+            } catch (err) {
+                alert("Network error during registration.");
+            }
+        }
+
+        async function handleLogin() {
+            let body = {
+                email: document.getElementById('log-email').value,
+                password: document.getElementById('log-password').value
+            };
+            try {
+                let res = await fetch('/api/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                let data = await res.json();
+                if (res.ok) {
+                    authToken = data.token;
+                    localStorage.setItem('nexus_token', authToken);
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    document.getElementById('dashboard').style.display = 'block';
+                    searchMentors();
+                    loadNotificationCount();
+                } else { 
+                    alert(data.error || "Login failed."); 
+                }
+            } catch (err) {
+                alert("Network error during login.");
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('nexus_token');
+            location.reload();
+        }
+
+        async function openAccountModal() {
+            let res = await fetch('/api/account', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            let user = await res.json();
+            document.getElementById('acc-name').value = user.name || '';
+            document.getElementById('acc-phone').value = user.phone || '';
+            document.getElementById('acc-bio').value = user.bio || '';
+            document.getElementById('acc-avatar').value = user.avatar_url || '';
+            document.getElementById('account-modal').classList.remove('hidden');
+        }
+
+        function closeAccountModal() {
+            document.getElementById('account-modal').classList.add('hidden');
+        }
+
+        async function saveAccountSettings() {
+            let res = await fetch('/api/account', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({
+                    name: document.getElementById('acc-name').value,
+                    phone: document.getElementById('acc-phone').value,
+                    bio: document.getElementById('acc-bio').value,
+                    avatar_url: document.getElementById('acc-avatar').value
+                })
+            });
+            let data = await res.json();
+            alert(data.message || data.error);
+            if (res.ok) closeAccountModal();
+        }
+
+        async function uploadCertificate() {
+            let res = await fetch('/api/certificates', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({
+                    certificate_name: document.getElementById('cert-title').value,
+                    certificate_details: document.getElementById('cert-desc').value,
+                    image_url: document.getElementById('cert-url').value
+                })
+            });
+            let data = await res.json();
+            alert(data.message || data.error);
+            if (res.ok) closeAccountModal();
+        }
+
+        async function loadNotificationCount() {
+            let res = await fetch('/api/notifications', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            let notifs = await res.json();
+            let unread = notifs.filter(n => !n.is_read).length;
+            document.getElementById('bell-count').innerText = unread;
+        }
+
+        async function openNotifModal() {
+            let res = await fetch('/api/notifications', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            let notifs = await res.json();
+            let container = document.getElementById('notif-list');
+            container.innerHTML = '';
+
+            if (notifs.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted); text-align:center;">No notifications yet.</p>';
+            }
+
+            notifs.forEach(n => {
+                let actionButtons = '';
+                if (n.type === 'SESSION_REQUEST' && !n.is_read) {
+                    actionButtons = `
+                        <div class="notif-actions">
+                            <button class="btn-accept" onclick="respondToSession(${n.session_id}, 'Approved', ${n.notification_id})">Accept Request</button>
+                            <button class="btn-deny" onclick="respondToSession(${n.session_id}, 'Rejected', ${n.notification_id})">Deny Request</button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="notif-card" style="${n.is_read ? 'opacity:0.6;' : ''}">
+                        <div style="font-size:13px; color:var(--text-main);">${n.message}</div>
+                        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">${new Date(n.created_at).toLocaleString()}</div>
+                        ${actionButtons}
+                    </div>
+                `;
+            });
+
+            document.getElementById('notif-modal').classList.remove('hidden');
+        }
+
+        function closeNotifModal() {
+            document.getElementById('notif-modal').classList.add('hidden');
+            loadNotificationCount();
+        }
+
+        async function respondToSession(sessionId, action, notificationId) {
+            let res = await fetch('/api/sessions/respond', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({ session_id: sessionId, action: action, notification_id: notificationId })
+            });
+            let data = await res.json();
+            alert(data.message || data.error);
+            openNotifModal();
+        }
+
+        async function searchMentors() {
+            let query = document.getElementById('search-input').value;
+            let res = await fetch(`/api/mentors/search?skill=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            let mentors = await res.json();
+            let grid = document.getElementById('mentor-results');
+            grid.innerHTML = '';
+            
+            if (mentors.length === 0) {
+                grid.innerHTML = '<p style="color: var(--text-muted);">No mentors found.</p>';
+                return;
+            }
+
+            mentors.forEach(m => {
+                let imgUrl = m.avatar_url || 'https://via.placeholder.com/50/334155/f8fafc?text=User';
+                grid.innerHTML += `
+                    <div class="mentor-card" onclick="viewMentorProfile(${m.user_id})">
+                        <img src="${imgUrl}" class="avatar" alt="Avatar">
+                        <div>
+                            <div class="mentor-name">${m.name}</div>
+                            <div class="mentor-bio">${m.bio || 'No bio provided.'}</div>
+                            <span style="color:var(--star-color); font-weight:600; font-size:13px;">★ ${m.avg_rating} / 5.0</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function viewMentorProfile(mentorId) {
+            let res = await fetch(`/api/mentors/${mentorId}/profile`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            let data = await res.json();
+            
+            document.getElementById('search-panel').classList.add('hidden');
+            let profilePanel = document.getElementById('profile-panel');
+            profilePanel.style.display = 'block';
+
+            let imgUrl = data.mentor.avatar_url || 'https://via.placeholder.com/80/334155/f8fafc?text=User';
+            
+            let offeredSkillsHtml = data.offered_skills.length 
+                ? data.offered_skills.map(s => `<span class="tag">${s.skill_name} (${s.experience_level})</span>`).join('') 
+                : '<p style="font-size:13px; color: var(--text-muted);">No offered skills listed.</p>';
+
+            let wantedSkillsHtml = data.wanted_skills.length 
+                ? data.wanted_skills.map(s => `<span class="tag tag-want">${s.skill_name}</span>`).join('') 
+                : '<p style="font-size:13px; color: var(--text-muted);">No wanted skills listed.</p>';
+            
+            let certsHtml = data.certificates.length ? data.certificates.map(c => `
+                <div style="margin-top:10px; padding:10px; background:#0f172a; border-radius:8px; border:1px solid var(--border-color);">
+                    <div style="color:var(--success); font-weight:600; font-size:13px;">✓ ${c.certificate_name}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${c.certificate_details || 'Official Proof'}</div>
+                    ${c.image_url ? `<img src="${c.image_url}" class="cert-img" alt="Certificate Image">` : ''}
+                </div>
+            `).join('') : '<p style="font-size:13px; color: var(--text-muted);">No certificates uploaded.</p>';
+
+            document.getElementById('profile-content').innerHTML = `
+                <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px;">
+                    <img src="${imgUrl}" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:3px solid var(--accent);" alt="Avatar">
+                    <div>
+                        <h2>${data.mentor.name}</h2>
+                        <p style="color: var(--text-muted); font-size:13px;">${data.mentor.bio || 'No public bio provided.'}</p>
+                        <p style="color: var(--star-color); font-weight:600; font-size:14px; margin-top:4px;">★ ${data.mentor.average_rating} Overall Rating</p>
+                    </div>
+                </div>
+                
+                <div class="section-title">Skills Offered</div>
+                <div>${offeredSkillsHtml}</div>
+
+                <div class="section-title">Skills Wanted to Learn</div>
+                <div>${wantedSkillsHtml}</div>
+
+                <div class="section-title">Certificates & Verification</div>
+                <div>${certsHtml}</div>
+
+                <div class="section-title">Schedule Mentoring Session</div>
+                <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <input type="date" id="book-date">
+                    <input type="time" id="book-time">
+                    <button style="width:100%;" onclick="bookSession(${mentorId})">Request Session</button>
+                </div>
+
+                <div class="section-title">Rate & Review Mentor</div>
+                <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div class="star-rating" id="star-container">
+                        <span class="star active" data-value="1">★</span>
+                        <span class="star active" data-value="2">★</span>
+                        <span class="star active" data-value="3">★</span>
+                        <span class="star active" data-value="4">★</span>
+                        <span class="star active" data-value="5">★</span>
+                    </div>
+                    <textarea id="rate-feedback" placeholder="Write your review..."></textarea>
+                    <button style="width:100%;" onclick="submitMentorRating(${mentorId})">Submit Review</button>
+                </div>
+            `;
+
+            initStarRating();
+        }
+
+        function initStarRating() {
+            selectedRating = 5;
+            const stars = document.querySelectorAll('#star-container .star');
+            stars.forEach(star => {
+                star.onclick = (e) => {
+                    selectedRating = Number(e.target.getAttribute('data-value'));
+                    stars.forEach(s => {
+                        if (Number(s.getAttribute('data-value')) <= selectedRating) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+                };
+            });
+        }
+
+        function backToSearch() {
+            document.getElementById('profile-panel').style.display = 'none';
+            document.getElementById('search-panel').classList.remove('hidden');
+        }
+
+        async function bookSession(mentorId) {
+            let res = await fetch('/api/sessions/request', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({ mentor_id: mentorId, session_date: document.getElementById('book-date').value, session_time: document.getElementById('book-time').value })
+            });
+            let data = await res.json();
+            alert(res.ok ? data.message : data.error);
+        }
+
+        async function submitMentorRating(mentorId) {
+            let res = await fetch('/api/ratings', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify({ mentor_id: mentorId, rating: selectedRating, feedback: document.getElementById('rate-feedback').value })
+            });
+            let data = await res.json();
+            alert(res.ok ? data.message : data.error);
+            if(res.ok) viewMentorProfile(mentorId);
+        }
+    </script>
+</body>
+</html>
